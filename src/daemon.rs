@@ -5,8 +5,10 @@ use std::{
         fs::PermissionsExt,
         net::{UnixListener, UnixStream},
     },
+    path::Path,
     sync::{Arc, Mutex},
     thread,
+    time::Duration,
 };
 
 use pico_gpio::{
@@ -17,27 +19,37 @@ use pico_gpio::{
 use crate::*;
 
 pub fn start(file: &str, baud: u32, socket_file: &str) {
-    let mut port = serialport::new(file, baud)
-        .open_native()
-        .expect("unable to open serial port");
-    port.set_exclusive(true).unwrap();
-    let gpio = PicoGPIO::new(port).expect("unable to open PicoGPIO connection");
+    loop {
+        let _ = fs::remove_file(socket_file);
+        while !Path::new(file).exists() {
+            thread::sleep(Duration::from_secs(2));
+        }
 
-    let gpio = Arc::new(Mutex::new(gpio));
-    let _ = fs::remove_file(socket_file);
-    let listener = UnixListener::bind(socket_file).expect("unable to start socket");
+        let mut port = serialport::new(file, baud)
+            .open_native()
+            .expect("unable to open serial port");
+        port.set_exclusive(true).unwrap();
+        let gpio = PicoGPIO::new(port).expect("unable to open PicoGPIO connection");
 
-    fs::set_permissions(socket_file, Permissions::from_mode(0o666))
-        .expect("unable to make connection available");
+        let gpio = Arc::new(Mutex::new(gpio));
+        let listener = UnixListener::bind(socket_file).expect("unable to start socket");
 
-    for connection in listener.incoming() {
-        let Ok(connection) = connection else {
-            continue;
-        };
-        let gpio = gpio.clone();
-        thread::spawn(move || {
-            let _ = handle(connection, gpio);
-        });
+        fs::set_permissions(socket_file, Permissions::from_mode(0o666))
+            .expect("unable to make connection available");
+
+        for connection in listener.incoming() {
+            if !Path::new(file).exists() {
+                break;
+            }
+
+            let Ok(connection) = connection else {
+                continue;
+            };
+            let gpio = gpio.clone();
+            thread::spawn(move || {
+                let _ = handle(connection, gpio);
+            });
+        }
     }
 }
 
