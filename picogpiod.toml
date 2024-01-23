@@ -1,0 +1,9 @@
+# this is a sample config for picogpiod
+# save it as /etc/picogpiod.toml
+
+[port]
+file = "/dev/ttyACM0"
+baud = 2000000
+
+[socket]
+file = "/run/picogpiod"
