@@ -1,0 +1,12 @@
+
+# -> /usr/lib/systemd/system/
+
+[Unit]
+Description=PicoGPIOd service
+
+[Service]
+User=root
+ExecStart=/bin/picogpiod
+
+[Install]
+WantedBy=multi-user.target
